@@ -1,6 +1,6 @@
 {
   "name": "claude-login-switcher",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "description": "Switch between Claude Code logins from the terminal",
   "type": "module",
   "bin": {
