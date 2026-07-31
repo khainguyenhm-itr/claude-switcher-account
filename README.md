@@ -14,11 +14,13 @@ canonical credential when you switch, so everything else in `~/.claude` stays sh
 
 Requires Node ≥ 18.
 
-From npm (once published):
+From npm:
 
 ```bash
-npm i -g claude-profiles
+npm i -g claude-profile-switcher
 ```
+
+(The npm package is `claude-profile-switcher`; the command it installs is `claude-p`.)
 
 From source or git (the `prepare` script builds automatically):
 

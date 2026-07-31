@@ -1,5 +1,5 @@
 {
-  "name": "claude-profiles",
+  "name": "claude-profile-switcher",
   "version": "1.0.0",
   "description": "Switch between Claude Code logins from the terminal",
   "type": "module",
