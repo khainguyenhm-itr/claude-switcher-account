@@ -12,14 +12,14 @@ function at(contents?: unknown) {
 }
 
 describe('ConfigStore', () => {
-  it('defaults to delete-switch when absent', () => {
-    expect(at().load()).toEqual({ logoutBehavior: 'delete-switch' });
+  it('defaults to keep when absent', () => {
+    expect(at().load()).toEqual({ logoutBehavior: 'keep' });
   });
   it('reads a valid behavior', () => {
-    expect(at({ logoutBehavior: 'keep' }).load().logoutBehavior).toBe('keep');
+    expect(at({ logoutBehavior: 'delete-switch' }).load().logoutBehavior).toBe('delete-switch');
   });
   it('falls back to default on an invalid value or malformed file', () => {
-    expect(at({ logoutBehavior: 'bogus' }).load().logoutBehavior).toBe('delete-switch');
-    expect(at('{bad').load().logoutBehavior).toBe('delete-switch');
+    expect(at({ logoutBehavior: 'bogus' }).load().logoutBehavior).toBe('keep');
+    expect(at('{bad').load().logoutBehavior).toBe('keep');
   });
 });

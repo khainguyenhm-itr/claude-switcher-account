@@ -1,5 +1,5 @@
 export const PKG_NAME = 'claude-login-switcher';
-export const VERSION = '1.2.0';
+export const VERSION = '1.3.0';
 
 /** -1 if a < b, 0 if equal, 1 if a > b. Compares the first three numeric segments. */
 export function compareVersions(a: string, b: string): number {

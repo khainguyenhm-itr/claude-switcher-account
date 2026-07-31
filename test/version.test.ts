@@ -39,7 +39,7 @@ describe('checkForUpdate', () => {
 
 describe('formatVersion', () => {
   it('shows the current version header', () => {
-    expect(formatVersion(null)).toContain('claude-p 1.2.0');
+    expect(formatVersion(null)).toContain('claude-p 1.3.0');
   });
   it('suggests an update when newer is available', () => {
     expect(formatVersion({ current: '1.0.0', latest: '2.0.0', isNewer: true })).toContain('v2.0.0 available');

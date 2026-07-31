@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import type { Config, LogoutBehavior } from './types.js';
 
 const VALID: LogoutBehavior[] = ['delete-switch', 'keep-switch', 'keep', 'none'];
-const DEFAULT: Config = { logoutBehavior: 'delete-switch' };
+// Default 'keep': never lose a saved account on logout — safest, especially with the daemon on.
+const DEFAULT: Config = { logoutBehavior: 'keep' };
 
 export interface ConfigStoreOpts {
   path: string;

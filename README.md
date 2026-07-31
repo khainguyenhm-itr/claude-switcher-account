@@ -60,40 +60,38 @@ and **q**/**Esc** to cancel. Selecting an account switches to it.
 
 ## How capture works
 
-There is **no manual `save`** — capture is automatic, in one of two modes:
+There is **no manual `save`** — capture is automatic. A global install
+(`npm i -g`) turns on **instant** capture by default; the **lazy** path is the
+fallback when the daemon is off.
 
-**Lazy (default).** Every `claude-p` command runs a reconcile first: it reads your
-current Claude login and, if it is new, snapshots it automatically (named by
-email). So after logging in with `claude`, simply running `claude-p list` captures
-the account. To give it a friendlier name, use `claude-p rename <email> <name>`.
+**Instant (default on global install).** A `postinstall` step runs
+`claude-p daemon install`, starting a background watcher on `~/.claude.json` that
+captures every login/switch/logout the moment it happens — no `claude-p` command
+needed. It autostarts on login (launchd on macOS, systemd user service on Linux,
+a logon Task on Windows). Check with `claude-p daemon status`; turn it off with
+`claude-p daemon uninstall`, or skip it at install time with
+`CLAUDE_P_NO_DAEMON=1 npm i -g claude-login-switcher`.
 
-**Instant (optional daemon).** Run `claude-p daemon install` to start a background
-watcher on `~/.claude.json`. It captures a new login the moment it happens —
-no `claude-p` command needed — and it autostarts on login (launchd on macOS,
-systemd user service on Linux, a logon Task on Windows). `claude-p daemon status`
-shows whether it's installed; `claude-p daemon uninstall` removes it.
+**Lazy (fallback).** With the daemon off, every `claude-p` command runs a
+reconcile first: it reads your current login and, if new, snapshots it. So after
+logging in with `claude`, simply running `claude-p list` captures the account. A
+login that happens while you never run `claude-p` is saved on your next invocation.
 
-> With the daemon on, a **logout** is handled instantly per `logoutBehavior`
-> (default `delete-switch` — forget the logged-out account and switch to the
-> newest remaining). Set `logoutBehavior` to `keep` in `~/.claude-profiles/config.json`
-> if you'd rather never lose a saved account on logout.
-
-Because capture is lazy, a login that happens while you never run `claude-p` is
-saved on your next invocation.
+Give any account a friendlier name with `claude-p rename <email> <name>`.
 
 ## Logout behavior
 
 Configured in `~/.claude-profiles/config.json`:
 
 ```jsonc
-{ "logoutBehavior": "delete-switch" }
+{ "logoutBehavior": "keep" }
 ```
 
 | value | on logout (credential + profile both gone) |
 |-------|--------------------------------------------|
-| `delete-switch` (default) | forget the logged-out account, switch to the newest remaining |
+| `keep` (default) | keep the account saved, stay signed out — never loses a backup |
 | `keep-switch` | keep the account saved, switch to another |
-| `keep` | keep the account saved, stay signed out |
+| `delete-switch` | forget the logged-out account, switch to the newest remaining |
 | `none` | do nothing |
 
 ## Where things live
