@@ -14,8 +14,10 @@ and only re-login when a token actually breaks.
 A prior solution exists as a VS Code extension (ClaudeSteps, macOS-only, using a
 background file watcher). `claude-profiles` is a **standalone, cross-platform CLI**
 that provides the same capability without an editor, and is **fully separate** from
-that extension — its own metadata store, its own credential namespace. The two are
-not meant to run their daemons at the same time (accepted; user's responsibility).
+that extension — its own metadata store, its own credential namespace. It runs no
+background process of its own; if the extension's watcher is also active it may
+react to the same login change, but since both only swap the one canonical slot the
+end state converges (accepted; user's responsibility).
 
 ## How Claude Code stores login (must verify per-OS at implementation time)
 
@@ -48,22 +50,26 @@ Consequences (accepted):
 
 ## Architecture
 
-Four layers, each with one purpose, each testable in isolation:
+Four layers, each with one purpose, each testable in isolation. There is **no
+background daemon**: every CLI command runs `reconcileOnChange()` first, so
+auto-save and active-detection happen lazily on use (see Behavior).
 
 ```
 CLI (commander)  ──►  AccountManager  ──►  CredentialStore (interface)
-                            │                   ├─ MacKeychainStore  (`security` CLI)
+  (reconcile first)         │                   ├─ MacKeychainStore  (`security` CLI)
                             │                   └─ FileStore         (Linux/Windows blob file, 0600)
                             ├─►  MetadataStore   (JSON, atomic temp+rename write + file lock)
                             └─►  ProfileFile     (read/write ~/.claude.json oauthAccount, atomic)
-Daemon (watch ~/.claude.json) ──► AccountManager.reconcileOnChange()
 ```
 
 `AccountManager` ports the proven logic from the extension's `accountManager.ts`
 (identity match `accountUuid` → `email` → fingerprint fallback; refresh the stored
 credential when a token rotates) but depends only on the injected `CredentialStore`,
 `MetadataStore`, and `ProfileFile` — so it is platform-agnostic and unit-testable
-without a real Keychain or filesystem.
+without a real Keychain or filesystem. Unlike the extension, it is driven by
+explicit command invocations rather than a file watcher, so the "which account was
+active" memory is **persisted to disk** (see MetadataStore `lastActive`) instead of
+held in process memory.
 
 ### CredentialStore (interface)
 
@@ -93,17 +99,23 @@ verification shows credentials live in Credential Manager rather than a file.
 JSON at `~/.claude-profiles/accounts.json`. Same shape as the extension:
 
 ```jsonc
-{ "accounts": [ {
-  "name": "ba@itrvn.com", "email": "ba@itrvn.com",
-  "displayName": "…", "organizationName": "ITR",
-  "fingerprint": "<sha256 of blob>", "savedAt": "<iso>",
-  "oauthAccount": { /* full snapshot from ~/.claude.json */ }
-} ] }
+{
+  "lastActive": "ba@itrvn.com",   // name last observed as the active login; used to
+                                  // know which account to forget on a later logout
+  "accounts": [ {
+    "name": "ba@itrvn.com", "email": "ba@itrvn.com",
+    "displayName": "…", "organizationName": "ITR",
+    "fingerprint": "<sha256 of blob>", "savedAt": "<iso>",
+    "oauthAccount": { /* full snapshot from ~/.claude.json */ }
+  } ]
+}
 ```
 
-Writes are **atomic** (write temp file + `rename`) and guarded by a file lock —
-fixing a race the extension had, so a daemon and a foreground command never
-corrupt the store.
+Writes are **atomic** (write temp file + `rename`) and guarded by a file lock, so
+two `claude-p` commands running at once never corrupt the store. Persisting
+`lastActive` here (rather than in process memory) makes logout handling
+deterministic — any invocation, in any terminal, knows what the last active
+account was.
 
 ### ProfileFile
 
@@ -114,25 +126,31 @@ avoid clobbering the large, Claude-owned config file. Best-effort; never corrupt
 
 ## Behavior
 
-### Auto-save (primary capture path — no manual `save` command)
+### Reconcile-on-command (capture path — no daemon, no manual `save`)
 
-The daemon watches `~/.claude.json`. On each change, `reconcileOnChange`:
+Every `claude-p` command runs `reconcileOnChange()` **before** its own work. It reads
+the current canonical login and, comparing against the saved store:
 
 - **New login** (blob fingerprint not yet saved, and an email is present) →
-  snapshot it as an account named by its email. If Claude wrote the credential
-  before populating `oauthAccount`, the email is briefly absent; the daemon simply
-  auto-saves on the *next* change once the email appears. No user action needed.
+  snapshot it as an account named by its email, and record it as `lastActive`. If
+  Claude wrote the credential before populating `oauthAccount`, the email is briefly
+  absent and the login is skipped; the *next* `claude-p` command captures it once
+  the email is present. No user action needed.
 - **Known login / switch** (identity or fingerprint matches a saved account) →
-  remember it as active; if the token rotated (fingerprint changed) refresh the
+  record it as `lastActive`; if the token rotated (fingerprint changed) refresh the
   stored credential so future switches use a valid token.
 - **Logout** (canonical credential AND `oauthAccount` both gone) → apply the
-  configured `logoutBehavior` (below).
+  configured `logoutBehavior` (below), using `lastActive` to know which account was
+  signed in.
 
-`reconcileOnChange` never throws — safe to call from a watcher.
+`reconcileOnChange` never throws — a reconcile failure never blocks the command the
+user actually asked for.
 
-There is **no manual `save` command**. Custom names are set with `claude-p rename`.
-`claude-p daemon install` runs one reconcile immediately so the current login is
-captured at setup time, closing the only gap where nothing was watching yet.
+Because capture is lazy, a login that happens while the user never runs `claude-p`
+is not saved until the next invocation. This is an accepted trade-off for dropping
+the background daemon: in practice the user runs `claude-p switch`/`list` around the
+logins they care about, so those get captured. There is **no manual `save`
+command**; custom names are set with `claude-p rename`.
 
 ### Logout behavior (configurable)
 
@@ -161,34 +179,20 @@ claude-p current              # (status/whoami) show the active login
 claude-p switch <name>        # (use) make <name> the active login
 claude-p remove <name> [-y]   # (rm) forget a saved account; -y skips the confirm prompt
 claude-p rename <old> <new>   # relabel / rekey a saved account
-claude-p doctor               # diagnose OS credential path, config, store, and daemon
-claude-p daemon run           # foreground reconcile loop (invoked by launchd/systemd/Task Scheduler)
-claude-p daemon start|stop|status
-claude-p daemon install|uninstall   # create/remove OS autostart, and run one reconcile on install
+claude-p doctor               # diagnose OS credential path, config, and store
 ```
 
+- Every command runs `reconcileOnChange()` first (see Behavior), so simply running
+  `claude-p list` after a new login is enough to capture it.
 - Global flags: `--json` (read commands, machine-readable output), `--version`, `--help`.
   Each command also has `claude-p <command> --help`.
 - `remove` asks for confirmation by default; `-y`/`--yes` skips it (for scripts).
 - `doctor` prints a per-section checklist (system, Claude login, claude-profiles
-  config/store/credentials, daemon) with ✓/✗/○ per check and a fix hint on each
-  failure; exits non-zero if any check fails. It is the first thing to run when the
-  per-OS credential location is wrong.
+  config/store/credentials) with ✓/✗/○ per check and a fix hint on each failure;
+  exits non-zero if any check fails. It is the first thing to run when the per-OS
+  credential location is wrong.
 - On an unsupported platform / missing backend, commands print a clear message and
   exit non-zero rather than crashing.
-
-## Daemon & autostart
-
-- `daemon run` watches `~/.claude.json` (`fs.watch`, debounced ~500ms) and calls
-  `reconcileOnChange`. On start it seeds the active-login memory (`noteActive`) so a
-  logout occurring before any file change still knows which account to forget.
-- `daemon install` writes the OS autostart unit and runs one immediate reconcile:
-  - **macOS**: a launchd user agent `~/Library/LaunchAgents/…plist`.
-  - **Linux**: a systemd **user** unit `~/.config/systemd/user/claude-profiles.service`.
-  - **Windows**: a Task Scheduler logon task (or Startup entry).
-- `daemon start/stop/status` wrap the OS mechanism (or manage a PID file when run
-  bare). Single-daemon assumption holds because the app is fully separate from the
-  extension.
 
 ## Error handling
 
@@ -196,18 +200,19 @@ claude-p daemon install|uninstall   # create/remove OS autostart, and run one re
   feature disabled with a clear message; no crash.
 - **macOS ACL prompt**: first `security …` read of Claude's slot may raise an
   "allow access" dialog. Expected; surface guidance if the read fails/empties.
-- **Empty/invalid canonical blob on save**: skip (daemon) / message (unreachable
-  via CLI since save is auto-only).
+- **Reconcile failure**: swallowed — it never blocks the command the user asked for.
 - **Switch target missing**: user-visible error; current login left intact.
 - **~/.claude.json malformed or mid-write**: best-effort; never corrupt it.
-- **Concurrent writes**: atomic temp+rename + file lock on the metadata store.
+- **Concurrent writes**: atomic temp+rename + file lock on the metadata store, so two
+  `claude-p` commands at once can't corrupt it.
 
 ## Testing
 
 - Port the extension's ~38 `AccountManager` unit tests, injecting a mock
   `CredentialStore` + fake `MetadataStore`/`ProfileFile` (no real Keychain/fs).
 - Add `FileStore` tests (Linux/Windows path + permission behavior, mocked fs).
-- Add a daemon debounce/reconcile test (fake watcher events → expected calls).
+- Add reconcile-on-command tests: a command captures a new login, marks active, and
+  a logout (via persisted `lastActive`) applies the configured behavior.
 - Target ≥90% coverage on the manager and stores.
 - Per-OS credential-location verification is a manual implementation task, not a
   unit test.
@@ -223,6 +228,8 @@ claude-p daemon install|uninstall   # create/remove OS autostart, and run one re
 - Windows Credential Manager / DPAPI backend (start file-based; add if verification
   requires it).
 - Importing accounts from the ClaudeSteps extension's store.
-- Detecting auth failures from `claude` output (re-login is manual; the daemon
-  re-captures it automatically).
+- A background daemon / instant auto-save on login. Capture is lazy
+  (reconcile-on-command); a daemon can be added later if instant capture is needed.
+- Detecting auth failures from `claude` output (re-login is manual; the next
+  `claude-p` command re-captures it automatically).
 ```
