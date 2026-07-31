@@ -44,6 +44,9 @@ claude-p remove <name> [-y]   # (rm) forget a saved account; -y skips the confir
 claude-p rename <old> <new>   # relabel a saved account
 claude-p version              # show the version and check npm for a newer one
 claude-p doctor               # diagnose credential path, config, and store
+claude-p daemon install       # run a background watcher for INSTANT capture (autostart on login)
+claude-p daemon status        # is the watcher installed?
+claude-p daemon uninstall     # remove the watcher
 ```
 
 Global flags: `--json` (on read commands), `--version`, `--help`.
@@ -57,11 +60,23 @@ and **q**/**Esc** to cancel. Selecting an account switches to it.
 
 ## How capture works
 
-There is **no background daemon** and **no manual `save`**. Every `claude-p`
-command runs a reconcile first: it reads your current Claude login and, if it is
-new, snapshots it automatically (named by email). So after logging in with
-`claude`, simply running `claude-p list` captures the account. To give it a
-friendlier name, use `claude-p rename <email> <name>`.
+There is **no manual `save`** — capture is automatic, in one of two modes:
+
+**Lazy (default).** Every `claude-p` command runs a reconcile first: it reads your
+current Claude login and, if it is new, snapshots it automatically (named by
+email). So after logging in with `claude`, simply running `claude-p list` captures
+the account. To give it a friendlier name, use `claude-p rename <email> <name>`.
+
+**Instant (optional daemon).** Run `claude-p daemon install` to start a background
+watcher on `~/.claude.json`. It captures a new login the moment it happens —
+no `claude-p` command needed — and it autostarts on login (launchd on macOS,
+systemd user service on Linux, a logon Task on Windows). `claude-p daemon status`
+shows whether it's installed; `claude-p daemon uninstall` removes it.
+
+> With the daemon on, a **logout** is handled instantly per `logoutBehavior`
+> (default `delete-switch` — forget the logged-out account and switch to the
+> newest remaining). Set `logoutBehavior` to `keep` in `~/.claude-profiles/config.json`
+> if you'd rather never lose a saved account on logout.
 
 Because capture is lazy, a login that happens while you never run `claude-p` is
 saved on your next invocation.

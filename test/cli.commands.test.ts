@@ -154,7 +154,7 @@ describe('cli commands', () => {
   it('version prints the version header', async () => {
     const { mgr } = makeManager('', {});
     const out = await run(mgr, ['version']);
-    expect(out).toContain('claude-p 1.1.0');
+    expect(out).toContain('claude-p 1.2.0');
   });
 
   it('no subcommand runs the interactive menu', async () => {

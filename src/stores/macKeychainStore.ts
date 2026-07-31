@@ -9,10 +9,12 @@ export const STORE_SERVICE = 'claude-profiles-accounts';
 
 export type SecurityExec = (args: string[]) => Promise<string>;
 
+/* v8 ignore start -- spawns the real `security` binary; injected in tests */
 const defaultExec: SecurityExec = async (args) => {
   const { stdout } = await execFileP('security', args);
   return stdout;
 };
+/* v8 ignore stop */
 
 export interface MacKeychainStoreOpts {
   exec?: SecurityExec;

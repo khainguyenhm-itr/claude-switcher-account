@@ -1,11 +1,15 @@
 import { Command } from 'commander';
 import { createInterface } from 'node:readline/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { AccountManager } from './accountManager.js';
 import { createManager } from './app.js';
 import { formatList, formatCurrent, SYMBOLS } from './format.js';
 import { runDoctor, buildDoctorDeps } from './doctor.js';
 import { VERSION, checkForUpdate, formatVersion, type UpdateInfo } from './version.js';
 import { runInteractiveMenu } from './menu.js';
+import { startDaemon } from './daemon.js';
+import { installAutostart, uninstallAutostart, autostartInstalled, type AutostartPaths } from './autostart.js';
 
 export interface CliDeps {
   manager?: AccountManager;
@@ -142,6 +146,62 @@ export function buildProgram(deps: CliDeps = {}): Command {
       out(report);
       if (!ok) process.exitCode = 1;
     });
+
+  /* v8 ignore start -- daemon CLI glue is OS-mutating wiring; the logic it calls is unit-tested */
+  const daemonPaths = (): AutostartPaths => ({
+    nodePath: process.execPath,
+    binPath: process.argv[1] ?? '',
+    logPath: join(homedir(), '.claude-profiles', 'daemon.log'),
+  });
+
+  const daemon = program.command('daemon').description('Background watcher for instant capture/switch');
+
+  daemon
+    .command('run')
+    .description('Run the watcher in the foreground (used by the OS autostart service)')
+    .action(async () => {
+      startDaemon(manager(), { log: out });
+      await new Promise<never>(() => {}); // keep the process alive
+    });
+
+  daemon
+    .command('install')
+    .description('Install autostart so the watcher runs on login, and capture the current login now')
+    .action(async () => {
+      try {
+        const msg = await installAutostart(process.platform, daemonPaths());
+        await manager().reconcileOnChange().catch(() => undefined);
+        out(`${SYMBOLS.ok} ${msg}\n  Instant capture is on — new logins are saved automatically.`);
+      } catch (e) {
+        out(`${SYMBOLS.err} ${(e as Error).message}`);
+        process.exitCode = 1;
+      }
+    });
+
+  daemon
+    .command('uninstall')
+    .description('Remove the autostart watcher')
+    .action(async () => {
+      try {
+        out(`${SYMBOLS.ok} ${await uninstallAutostart(process.platform)}`);
+      } catch (e) {
+        out(`${SYMBOLS.err} ${(e as Error).message}`);
+        process.exitCode = 1;
+      }
+    });
+
+  daemon
+    .command('status')
+    .description('Show whether the autostart watcher is installed')
+    .action(() => {
+      const on = autostartInstalled(process.platform);
+      out(
+        on
+          ? `${SYMBOLS.active} daemon autostart installed`
+          : `${SYMBOLS.off} daemon not installed — run: claude-p daemon install`,
+      );
+    });
+  /* v8 ignore stop */
 
   return program;
 }
