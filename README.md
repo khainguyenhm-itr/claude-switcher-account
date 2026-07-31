@@ -17,10 +17,10 @@ Requires Node ≥ 18.
 From npm:
 
 ```bash
-npm i -g claude-profile-switcher
+npm i -g claude-login-switcher
 ```
 
-(The npm package is `claude-profile-switcher`; the command it installs is `claude-p`.)
+(The npm package is `claude-login-switcher`; the command it installs is `claude-p`.)
 
 From source or git (the `prepare` script builds automatically):
 
