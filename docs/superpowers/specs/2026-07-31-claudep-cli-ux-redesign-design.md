@@ -31,7 +31,29 @@ short command name, number-based quick switching, and a clean colored list.
 | Color | **Yes**, auto-disabled on pipe / `NO_COLOR` / `--json` |
 | Quick switch | **Bare number only**: `claudep 2` (names still need `switch`) |
 | `current`/`status` | **Merged** into `list` (kept as aliases) |
-| Aliases | **Keep** `ls`, `use`, `rm` |
+| Aliases | **Keep** `ls`, `use`, `rm`; `status`/`current` become aliases of `list` |
+| Menu style | **Sectioned + hotkey** — header + divider, accounts navigable, `r`/`d`/`q` hotkeys |
+| Remove in menu | **Dropped** — destructive action lives only at `claudep remove <name\|n>` |
+| Usage / reset / used% | **Out of scope** — rate-limit data is live server-side, not cached on disk; showing it would require calling an unofficial endpoint per stored token |
+
+## Display grammar (applied to every screen)
+
+One consistent language across all output:
+
+- **Indent** every line by 2 spaces.
+- **Multi-line screens** (menu, list, doctor, version) open with a header
+  `claudep · <context>` (bold + dim) and a divider rule.
+- **Result lines** follow one pattern: `<symbol> <message>` plus an optional
+  dim continuation line indented 4 spaces (replaces ad-hoc parentheticals).
+- **Symbols carry fixed roles**: `●` green = active/on · `○` dim = off ·
+  `✓` green = success · `✗` red = error (exit 1) · `!` yellow = notice ·
+  `❯` cyan = cursor · `→` dim / hotkey letters cyan = interactive.
+- **Colors** are role-based (green active/success, red error, yellow notice,
+  cyan interactive, dim secondary) and auto-off on pipe / `NO_COLOR` / `--json`.
+
+`SYMBOLS.warn` changes from `⚠` to `!`. Result-message wording is the two-line
+pattern above (e.g. switch → `✓ Now using <name>` + dim `restart running claude
+sessions to apply`; errors → `✗ <what>` + dim `run claudep list …`).
 
 ## 1. Command Surface
 
@@ -108,13 +130,16 @@ Formatting rules (`formatList(views, nowMs, colors)`):
 
 ## 3. Other Output
 
-- **Switch success** collapses to one line:
-  `✓ Now using ba@itrvn.com  (restart running claude sessions to apply)`
-  The standalone second warning line is removed; the parenthetical carries it.
-- **Menu** reuses the numbered + colored row format from `list` for visual
-  consistency; title shortened to `claudep`. Number-key quick-pick (1–9) already
-  exists and now visually matches the printed indices. Action rows (Rename /
-  Remove / Doctor / Quit) render below the numbered accounts.
+- **Switch success** uses the two-line result pattern:
+  `✓ Now using ba@itrvn.com` + dim `restart running claude sessions to apply`.
+- **Menu** (`claudep`, no args) is **sectioned + hotkey**: header
+  `claudep · N accounts`, a divider, then one numbered account row per account
+  (arrow / number keys navigate & switch), a divider, and a hotkey bar
+  `r rename · d doctor · q quit`. The selected row is drawn with a background
+  highlight (not by recoloring the text) so the active row keeps its green.
+  **Remove is not in the menu** — it stays a command only. `interactiveSelect`
+  therefore separates navigable account rows from action hotkeys (`r`/`d`/`q`),
+  and `MenuAction` drops the `remove` variant.
 - All user-facing strings that say `claude-p` become `claudep` (help text,
   messages, empty state, daemon log prefix `[claude-p]` → `[claudep]`, doctor
   hints, version/update hint). **Storage paths and Keychain service names are

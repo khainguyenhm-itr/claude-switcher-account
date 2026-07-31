@@ -68,7 +68,7 @@ describe('cli commands', () => {
     const { mgr } = makeManager('BLOB', { oauthAccount: { emailAddress: 'a@x.com', organizationName: 'ITR' } });
     const out = await run(mgr, ['list']);
     expect(out).toContain('a@x.com');
-    expect(out).toContain('(active)');
+    expect(out).toContain('active');
   });
 
   it('switch changes the active login', async () => {
@@ -85,7 +85,42 @@ describe('cli commands', () => {
     store.saved['b@x.com'] = 'BLOB_B';
     const out = await run(mgr, ['switch', 'b@x.com']);
     expect(store.canonical).toBe('BLOB_B');
-    expect(out).toContain('Switched to b@x.com');
+    expect(out).toContain('Now using b@x.com');
+  });
+
+  it('switches by number at the top level (claudep <n>)', async () => {
+    const { store, meta, mgr } = makeManager('', {});
+    await meta.update((d) => {
+      d.accounts.push({ name: 'b@x.com', email: 'b@x.com', fingerprint: 'f', savedAt: 'T' });
+      d.accounts.push({ name: 'a@x.com', email: 'a@x.com', fingerprint: 'g', savedAt: 'T' });
+    });
+    store.saved['a@x.com'] = 'BLOB_A';
+    store.saved['b@x.com'] = 'BLOB_B';
+    const out = await run(mgr, ['1']); // index 1 = a@x.com (email order)
+    expect(store.canonical).toBe('BLOB_A');
+    expect(out).toContain('Now using a@x.com');
+  });
+
+  it('switch also accepts a number', async () => {
+    const { store, meta, mgr } = makeManager('', {});
+    await meta.update((d) => d.accounts.push({ name: 'a@x.com', email: 'a@x.com', fingerprint: 'f', savedAt: 'T' }));
+    store.saved['a@x.com'] = 'BLOB_A';
+    await run(mgr, ['switch', '1']);
+    expect(store.canonical).toBe('BLOB_A');
+  });
+
+  it('a non-numeric bare argument is an unknown account error', async () => {
+    const { mgr } = makeManager('', {});
+    const out = await run(mgr, ['foo']);
+    expect(out).toMatch(/unknown account/i);
+  });
+
+  it('an out-of-range number reports no such account', async () => {
+    const { store, meta, mgr } = makeManager('', {});
+    await meta.update((d) => d.accounts.push({ name: 'a@x.com', email: 'a@x.com', fingerprint: 'f', savedAt: 'T' }));
+    store.saved['a@x.com'] = 'BLOB_A';
+    const out = await run(mgr, ['9']);
+    expect(out).toMatch(/no account #9/i);
   });
 
   it('remove asks for confirmation and deletes on yes', async () => {
@@ -119,10 +154,10 @@ describe('cli commands', () => {
     expect(out).toContain('work');
   });
 
-  it('current shows the active login after reconcile', async () => {
+  it('current and status are aliases of list', async () => {
     const { mgr } = makeManager('BLOB', { oauthAccount: { emailAddress: 'a@x.com', organizationName: 'ITR' } });
-    const out = await run(mgr, ['current']);
-    expect(out).toContain('a@x.com');
+    expect(await run(mgr, ['current'])).toContain('a@x.com');
+    expect(await run(mgr, ['status'])).toContain('a@x.com');
   });
 
   it('switch reports an error for an unknown account', async () => {
@@ -154,7 +189,7 @@ describe('cli commands', () => {
   it('version prints the version header', async () => {
     const { mgr } = makeManager('', {});
     const out = await run(mgr, ['version']);
-    expect(out).toMatch(/claude-p \d+\.\d+\.\d+/);
+    expect(out).toMatch(/claudep \d+\.\d+\.\d+/);
   });
 
   it('no subcommand runs the interactive menu', async () => {

@@ -1,4 +1,4 @@
-# claude-profiles (`claude-p`)
+# claude-profiles (`claudep`)
 
 Switch between multiple Claude Code logins from the terminal. Save several
 logged-in accounts, pick one to use, and only re-login when a token actually
@@ -7,7 +7,7 @@ breaks. macOS + Linux + Windows.
 ## Why
 
 Claude Code keeps a single active login per machine — logging into a second
-account overwrites the first. `claude-p` snapshots each login and swaps only the
+account overwrites the first. `claudep` snapshots each login and swaps only the
 canonical credential when you switch, so everything else in `~/.claude` stays shared.
 
 ## Install
@@ -20,7 +20,7 @@ From npm:
 npm i -g claude-login-switcher
 ```
 
-(The npm package is `claude-login-switcher`; the command it installs is `claude-p`.)
+(The npm package is `claude-login-switcher`; the command it installs is `claudep`.)
 
 From source or git (the `prepare` script builds automatically):
 
@@ -30,33 +30,38 @@ npm i -g git+<repo-url>
 git clone <repo-url> claude-profiles && cd claude-profiles && npm i -g .
 ```
 
-Verify with `claude-p doctor`. On macOS the first run may raise a Keychain
+Verify with `claudep doctor`. On macOS the first run may raise a Keychain
 "allow access" dialog — click Allow.
 
 ## Commands
 
 ```
-claude-p                      # interactive menu: pick an account to switch to, or an action
-claude-p list                 # (ls) list saved accounts, mark the active one
-claude-p current              # (status) show the active login
-claude-p switch <name>        # (use) make <name> the active login
-claude-p remove <name> [-y]   # (rm) forget a saved account; -y skips the confirm
-claude-p rename <old> <new>   # relabel a saved account
-claude-p version              # show the version and check npm for a newer one
-claude-p doctor               # diagnose credential path, config, and store
-claude-p daemon install       # run a background watcher for INSTANT capture (autostart on login)
-claude-p daemon status        # is the watcher installed?
-claude-p daemon uninstall     # remove the watcher
+claudep                        # interactive menu: pick an account to switch to
+claudep <n>                    # switch to account #n (as numbered by `list`)
+claudep list                   # (ls, status, current) list saved accounts, mark the active one
+claudep switch <name|n>        # (use) make an account active, by name or number
+claudep remove <name|n> [-y]   # (rm) forget a saved account; -y skips the confirm
+claudep rename <old> <new>     # relabel a saved account
+claudep version                # show the version and check npm for a newer one
+claudep doctor                 # diagnose credential path, config, and store
+claudep daemon install         # run a background watcher for INSTANT capture (autostart on login)
+claudep daemon status          # is the watcher installed?
+claudep daemon uninstall       # remove the watcher
 ```
 
-Global flags: `--json` (on read commands), `--version`, `--help`.
+Accounts are numbered in a stable order (by email), so `claudep 2` always refers
+to the same account. Output is colored on a terminal and plain when piped, `--json`,
+or `NO_COLOR` is set.
+
+Global flags: `--json` (on `list`), `--version`, `--help`.
 
 ### Interactive menu
 
-Running `claude-p` with no arguments (in a terminal) opens a menu listing your
-saved accounts plus Rename / Remove / Doctor / Quit. Navigate with **↑/↓ or the
-mouse wheel**, press **Enter** to select (or a **number key** for a quick pick),
-and **q**/**Esc** to cancel. Selecting an account switches to it.
+Running `claudep` with no arguments (in a terminal) opens a menu of your saved
+accounts. Navigate with **↑/↓ or the mouse wheel**, press **Enter** (or a
+**number key**) to switch to the highlighted account. Action hotkeys work
+anywhere: **r** rename · **d** doctor · **q**/**Esc** quit. Removing an account is
+deliberately kept out of the menu — use `claudep remove <name|n>`.
 
 ## How capture works
 
@@ -65,19 +70,19 @@ There is **no manual `save`** — capture is automatic. A global install
 fallback when the daemon is off.
 
 **Instant (default on global install).** A `postinstall` step runs
-`claude-p daemon install`, starting a background watcher on `~/.claude.json` that
-captures every login/switch/logout the moment it happens — no `claude-p` command
+`claudep daemon install`, starting a background watcher on `~/.claude.json` that
+captures every login/switch/logout the moment it happens — no `claudep` command
 needed. It autostarts on login (launchd on macOS, systemd user service on Linux,
-a logon Task on Windows). Check with `claude-p daemon status`; turn it off with
-`claude-p daemon uninstall`, or skip it at install time with
+a logon Task on Windows). Check with `claudep daemon status`; turn it off with
+`claudep daemon uninstall`, or skip it at install time with
 `CLAUDE_P_NO_DAEMON=1 npm i -g claude-login-switcher`.
 
-**Lazy (fallback).** With the daemon off, every `claude-p` command runs a
+**Lazy (fallback).** With the daemon off, every `claudep` command runs a
 reconcile first: it reads your current login and, if new, snapshots it. So after
-logging in with `claude`, simply running `claude-p list` captures the account. A
-login that happens while you never run `claude-p` is saved on your next invocation.
+logging in with `claude`, simply running `claudep list` captures the account. A
+login that happens while you never run `claudep` is saved on your next invocation.
 
-Give any account a friendlier name with `claude-p rename <email> <name>`.
+Give any account a friendlier name with `claudep rename <email> <name>`.
 
 ## Logout behavior
 
@@ -103,7 +108,7 @@ Configured in `~/.claude-profiles/config.json`:
 - Account metadata: `~/.claude-profiles/accounts.json`.
 
 On macOS the first read of Claude's Keychain item may raise an "allow access"
-dialog — click Allow. Run `claude-p doctor` if anything looks off.
+dialog — click Allow. Run `claudep doctor` if anything looks off.
 
 ## Uninstalling
 
@@ -115,7 +120,7 @@ Remove cleanly (turn off the autostart watcher first, or it's left orphaned poin
 at the deleted binary):
 
 ```bash
-claude-p daemon uninstall
+claudep daemon uninstall
 npm rm -g claude-login-switcher
 ```
 

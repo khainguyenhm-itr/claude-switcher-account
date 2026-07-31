@@ -4,7 +4,7 @@
   "description": "Switch between Claude Code logins from the terminal",
   "type": "module",
   "bin": {
-    "claude-p": "dist/bin.js"
+    "claudep": "dist/bin.js"
   },
   "files": [
     "dist",

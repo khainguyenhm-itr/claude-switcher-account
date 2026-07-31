@@ -1,4 +1,5 @@
 import pkg from '../package.json';
+import { makeColors, type Colors } from './color.js';
 
 // Single source of truth: name/version come from package.json (inlined at build by tsup).
 export const PKG_NAME: string = pkg.name;
@@ -38,9 +39,13 @@ export async function checkForUpdate(
   }
 }
 
-export function formatVersion(info: UpdateInfo | null): string {
-  const head = `claude-p ${VERSION}  (npm: ${PKG_NAME})`;
-  if (!info) return `${head}\n  (could not check for updates)`;
-  if (info.isNewer) return `${head}\n  ▲ v${info.latest} available — update: npm i -g ${PKG_NAME}`;
-  return `${head}\n  ✓ up to date`;
+export function formatVersion(info: UpdateInfo | null, colors: Colors = makeColors(false)): string {
+  const head = `  ${colors.bold(`claudep ${VERSION}`)}  ${colors.dim(`· npm: ${PKG_NAME}`)}`;
+  const rule = colors.dim('  ──────────────────────────────────────────');
+  let result: string;
+  if (!info) result = colors.dim('  · could not check for updates');
+  else if (info.isNewer)
+    result = `  ${colors.yellow('▲')} v${info.latest} available\n${colors.dim(`    update: ${colors.cyan(`npm i -g ${PKG_NAME}`)}`)}`;
+  else result = `  ${colors.green('✓')} up to date`;
+  return [head, rule, result].join('\n');
 }

@@ -1,6 +1,6 @@
 // Best-effort: on a global install, turn on the instant-capture daemon so the user
-// doesn't have to run `claude-p daemon install` by hand. Never fails the install.
-// Opt out with CLAUDE_P_NO_DAEMON=1. Undo any time with `claude-p daemon uninstall`.
+// doesn't have to run `claudep daemon install` by hand. Never fails the install.
+// Opt out with CLAUDE_P_NO_DAEMON=1. Undo any time with `claudep daemon uninstall`.
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';

@@ -6,6 +6,7 @@ import { MetadataStore } from './metadataStore.js';
 import { createCredentialStore } from './credentialStore.js';
 import { ConfigStore } from './config.js';
 import { SYMBOLS } from './format.js';
+import { makeColors, type Colors } from './color.js';
 
 export interface DoctorDeps {
   store: CredentialStore;
@@ -22,7 +23,10 @@ interface Check {
   hint?: string;
 }
 
-export async function runDoctor(deps: DoctorDeps): Promise<{ ok: boolean; report: string }> {
+export async function runDoctor(
+  deps: DoctorDeps,
+  colors: Colors = makeColors(false),
+): Promise<{ ok: boolean; report: string }> {
   const checks: { section: string; items: Check[] }[] = [];
 
   checks.push({
@@ -47,7 +51,7 @@ export async function runDoctor(deps: DoctorDeps): Promise<{ ok: boolean; report
         ok: !!blob,
         label: 'canonical slot',
         detail: blob ? 'present' : 'missing',
-        hint: 'run `claude` and log in once, then `claude-p doctor`',
+        hint: 'run `claude` and log in once, then `claudep doctor`',
       },
       {
         ok: !!label,
@@ -60,30 +64,37 @@ export async function runDoctor(deps: DoctorDeps): Promise<{ ok: boolean; report
 
   const accounts = deps.meta.read().accounts;
   checks.push({
-    section: 'claude-profiles',
+    section: 'Store',
     items: [
       { ok: true, label: 'config', detail: `logout=${deps.config.logoutBehavior}` },
-      { ok: true, label: 'store', detail: `${accounts.length} account${accounts.length === 1 ? '' : 's'}` },
+      { ok: true, label: 'accounts', detail: `${accounts.length} saved` },
     ],
   });
 
-  const lines: string[] = ['', 'claude-profiles doctor', ''];
+  const lines: string[] = [
+    `  ${colors.bold('claudep')} ${colors.dim('· doctor')}`,
+    colors.dim('  ──────────────────────────────────────────'),
+  ];
   let ok = true;
   let issues = 0;
   for (const group of checks) {
-    lines.push(`  ${group.section}`);
+    lines.push(`  ${colors.bold(group.section)}`);
     for (const c of group.items) {
-      const sym = c.ok ? SYMBOLS.ok : SYMBOLS.err;
+      const sym = c.ok ? colors.green(SYMBOLS.ok) : colors.red(SYMBOLS.err);
       if (!c.ok) {
         ok = false;
         issues++;
       }
-      lines.push(`    ${sym} ${c.label.padEnd(18)} ${c.detail}`);
-      if (!c.ok && c.hint) lines.push(`      → ${c.hint}`);
+      lines.push(`    ${sym} ${c.label.padEnd(18)} ${colors.dim(c.detail)}`);
+      if (!c.ok && c.hint) lines.push(colors.dim(`      → ${c.hint}`));
     }
-    lines.push('');
   }
-  lines.push(ok ? '  All checks passed.' : `  ${issues} issue${issues === 1 ? '' : 's'} found.`);
+  lines.push('');
+  lines.push(
+    ok
+      ? `  ${colors.green(SYMBOLS.ok)} All checks passed`
+      : `  ${colors.red(SYMBOLS.err)} ${issues} issue${issues === 1 ? '' : 's'} found`,
+  );
   return { ok, report: lines.join('\n') };
 }
 

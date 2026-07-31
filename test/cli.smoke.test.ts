@@ -5,7 +5,7 @@ import { VERSION } from '../src/version.js';
 describe('cli', () => {
   it('exposes name and version', () => {
     const program = buildProgram();
-    expect(program.name()).toBe('claude-p');
+    expect(program.name()).toBe('claudep');
     expect(program.version()).toBe(VERSION);
   });
 });

@@ -23,7 +23,7 @@ export async function reconcileAndLog(manager: AccountManager, log: (s: string) 
   try {
     const r = await manager.reconcileOnChange();
     const msg = formatReconcileLog(r);
-    if (msg) log(`[claude-p] ${msg}`);
+    if (msg) log(`[claudep] ${msg}`);
   } catch {
     /* never throw from the watcher */
   }
@@ -48,7 +48,7 @@ export function startDaemon(manager: AccountManager, opts: DaemonOptions = {}): 
   const log = opts.log ?? ((s: string) => console.log(s));
   const subscribe = opts.watch ?? defaultWatch;
 
-  log(`[claude-p] watching ${path} every ${interval}ms — instant capture on login/switch/logout`);
+  log(`[claudep] watching ${path} every ${interval}ms — instant capture on login/switch/logout`);
   void reconcileAndLog(manager, log); // capture the current login right away
   return subscribe(path, interval, () => void reconcileAndLog(manager, log));
 }

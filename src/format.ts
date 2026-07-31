@@ -1,6 +1,8 @@
-import type { AccountView, OauthLabel } from './types.js';
+import type { AccountView } from './types.js';
+import type { Colors } from './color.js';
+import { orderAccounts } from './order.js';
 
-export const SYMBOLS = { active: '●', ok: '✓', err: '✗', warn: '⚠', off: '○' } as const;
+export const SYMBOLS = { active: '●', ok: '✓', err: '✗', warn: '!', off: '○' } as const;
 
 export function formatRelative(iso: string, nowMs: number): string {
   const then = Date.parse(iso);
@@ -24,30 +26,55 @@ function pad(s: string, width: number): string {
   return s.length >= width ? s : s + ' '.repeat(width - s.length);
 }
 
-export function formatList(views: AccountView[], nowMs: number): string {
-  if (views.length === 0) {
-    return '  No saved accounts. Log in with `claude`, then run `claude-p list` to capture it.';
-  }
-  const nameW = Math.max(20, ...views.map((v) => v.email.length + 2));
-  const header = `  ${pad('ACCOUNT', nameW)}${pad('ORG', 12)}SAVED`;
-  const rows = views.map((v) => {
-    const mark = v.active ? SYMBOLS.active : ' ';
-    const org = v.organizationName ?? '—';
-    const when = formatRelative(v.savedAt, nowMs) + (v.active ? '      (active)' : '');
-    return `${mark} ${pad(v.email, nameW)}${pad(org, 12)}${when}`;
-  });
-  const count = `${views.length} account${views.length === 1 ? '' : 's'}`;
-  return [header, ...rows, '', count].join('\n');
+function truncate(s: string, max: number): string {
+  return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
 }
 
-export function formatCurrent(res: { saved: AccountView | null; label: OauthLabel | null }): string {
-  if (res.saved) {
-    const org = res.saved.organizationName ? ` · ${res.saved.organizationName}` : '';
-    const name = res.saved.displayName ? `${res.saved.displayName}${org}` : (res.saved.organizationName ?? '');
-    return `${SYMBOLS.active} ${res.saved.email}${name ? `\n  ${name}` : ''}`;
+const ORG_MAX = 20;
+
+export interface ListOptions {
+  /** Email of an active login that isn't among the saved accounts yet (folds in the old `current` note). */
+  external?: string;
+}
+
+/** Numbered, colored account list. `colors` is an injected colorizer so the output stays pure and
+ *  colors vanish when disabled (pipes / NO_COLOR / --json). Accounts are shown in `orderAccounts`
+ *  order, so the printed numbers match `claudep <n>`. */
+export function formatList(views: AccountView[], nowMs: number, colors: Colors, opts: ListOptions = {}): string {
+  const header = `  ${colors.bold('claudep')} ${colors.dim(`· ${views.length} account${views.length === 1 ? '' : 's'}`)}`;
+
+  if (views.length === 0) {
+    return [
+      header,
+      colors.dim('  ──────────────────────────────────────────'),
+      colors.dim('  No saved accounts yet.'),
+      colors.dim(`  → log in with ${colors.cyan('claude')}, then run ${colors.cyan('claudep list')}`),
+    ].join('\n');
   }
-  if (res.label) {
-    return `${SYMBOLS.active} external login (${res.label.email}) — not yet saved\n  Run any claude-p command again after the session initializes to capture it.`;
+
+  const ordered = orderAccounts(views);
+  const idxW = String(ordered.length).length;
+  const emailW = Math.max(...ordered.map((v) => v.email.length));
+  const orgW = Math.min(ORG_MAX, Math.max(...ordered.map((v) => (v.organizationName ?? '—').length)));
+
+  const rows = ordered.map((v, i) => {
+    const idx = colors.dim(pad(String(i + 1), idxW));
+    const mark = v.active ? colors.green(SYMBOLS.active) : ' ';
+    const email = v.active ? colors.green(pad(v.email, emailW)) : pad(v.email, emailW);
+    const org = colors.dim(pad(truncate(v.organizationName ?? '—', ORG_MAX), orgW));
+    const when = v.active ? colors.green('active') : colors.dim(formatRelative(v.savedAt, nowMs));
+    return `  ${idx}  ${mark} ${email}  ${org}  ${when}`;
+  });
+
+  const lines = [header, colors.dim('  ──────────────────────────────────────────'), ...rows, ''];
+
+  if (opts.external) {
+    lines.push(
+      `  ${colors.yellow(SYMBOLS.warn)} ${colors.dim(`${opts.external} is active but not saved yet`)}`,
+      colors.dim('    run any command again to capture it'),
+    );
   }
-  return `${SYMBOLS.off} no active Claude login`;
+  if (ordered.length > 1) lines.push(colors.dim('  → claudep <n> to switch'));
+
+  return lines.join('\n').replace(/\n+$/, '');
 }

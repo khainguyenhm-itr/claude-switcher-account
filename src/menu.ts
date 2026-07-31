@@ -1,13 +1,14 @@
 import { createInterface } from 'node:readline/promises';
 import type { AccountView } from './types.js';
 import type { AccountManager } from './accountManager.js';
-import { SYMBOLS } from './format.js';
+import { SYMBOLS, formatRelative } from './format.js';
+import { makeColors } from './color.js';
+import { orderAccounts } from './order.js';
 import { runDoctor, buildDoctorDeps } from './doctor.js';
 
 export type MenuAction =
   | { type: 'switch'; name: string }
   | { type: 'rename' }
-  | { type: 'remove' }
   | { type: 'doctor' }
   | { type: 'quit' };
 
@@ -16,21 +17,24 @@ export interface MenuChoice {
   action: MenuAction;
 }
 
-/** Build the top-level menu: one entry per saved account (switch), then actions. Pure + testable. */
+function pad(s: string, width: number): string {
+  return s.length >= width ? s : s + ' '.repeat(width - s.length);
+}
+
+/** One numbered switch row per account, in the same order as `list` so the numbers match. Pure. */
 export function buildMenuChoices(accounts: AccountView[]): MenuChoice[] {
-  const choices: MenuChoice[] = accounts.map((a) => ({
-    label: `${a.active ? SYMBOLS.active : ' '} ${a.email}${a.organizationName ? `  (${a.organizationName})` : ''}${
-      a.active ? '  — active' : ''
-    }`,
-    action: { type: 'switch', name: a.name },
-  }));
-  if (accounts.length) {
-    choices.push({ label: 'Rename an account…', action: { type: 'rename' } });
-    choices.push({ label: 'Remove an account…', action: { type: 'remove' } });
-  }
-  choices.push({ label: 'Doctor', action: { type: 'doctor' } });
-  choices.push({ label: 'Quit', action: { type: 'quit' } });
-  return choices;
+  const ordered = orderAccounts(accounts);
+  if (!ordered.length) return [];
+  const emailW = Math.max(...ordered.map((a) => a.email.length));
+  return ordered.map((a, i) => {
+    const mark = a.active ? SYMBOLS.active : ' ';
+    const when = a.active ? 'active' : formatRelative(a.savedAt, Date.now());
+    const org = a.organizationName ? `  ${a.organizationName}` : '';
+    return {
+      label: `${i + 1}  ${mark} ${pad(a.email, emailW)}${org}  ${when}`,
+      action: { type: 'switch', name: a.name },
+    };
+  });
 }
 
 /** Everything the menu needs from the outside world — injected so dispatch/runMenu are testable. */
@@ -43,7 +47,7 @@ export interface MenuIO {
 }
 
 function accountChoices(views: AccountView[]): MenuChoice[] {
-  return views.map((v) => ({ label: v.email, action: { type: 'switch', name: v.name } }));
+  return orderAccounts(views).map((v) => ({ label: v.email, action: { type: 'switch', name: v.name } }));
 }
 
 /** Run one menu action against the manager. Pure of any TTY concerns. */
@@ -54,7 +58,7 @@ export async function dispatchMenu(manager: AccountManager, action: MenuAction, 
     case 'switch':
       try {
         await manager.switchTo(action.name);
-        io.out(`${SYMBOLS.ok} Switched to ${action.name}`);
+        io.out(`${SYMBOLS.ok} Now using ${action.name}`);
       } catch (e) {
         io.out(`${SYMBOLS.err} ${(e as Error).message}`);
       }
@@ -84,24 +88,6 @@ export async function dispatchMenu(manager: AccountManager, action: MenuAction, 
       }
       return;
     }
-    case 'remove': {
-      const views = await manager.listAccounts();
-      if (!views.length) {
-        io.out('No saved accounts.');
-        return;
-      }
-      const choice = await io.pick('Remove which account?', accountChoices(views));
-      if (!choice || choice.action.type !== 'switch') return;
-      const name = choice.action.name;
-      const ok = await io.confirm(`Remove '${name}'? This deletes its stored credential.`);
-      if (!ok) {
-        io.out('Cancelled.');
-        return;
-      }
-      await manager.removeAccount(name);
-      io.out(`${SYMBOLS.ok} Removed ${name}`);
-      return;
-    }
   }
 }
 
@@ -112,38 +98,53 @@ export async function runMenu(manager: AccountManager, io: MenuIO): Promise<void
   } catch {
     /* ignore */
   }
-  const choices = buildMenuChoices(await manager.listAccounts());
-  const choice = await io.pick('claude-p — pick an account to switch to, or an action:', choices);
+  const accounts = await manager.listAccounts();
+  const choice = await io.pick(`claudep · ${accounts.length} account${accounts.length === 1 ? '' : 's'}`, buildMenuChoices(accounts));
   if (!choice) return;
   await dispatchMenu(manager, choice.action, io);
 }
 
 /* v8 ignore start -- raw-TTY interaction: needs a real terminal, not unit-testable */
+const DIVIDER = '──────────────────────────────────────────';
+
 /**
- * Raw-TTY arrow/scroll/number selector. Keyboard: ↑/↓ or j/k to move, Enter to pick, 1-9 quick-pick,
- * q/Esc/Ctrl-C to cancel. Mouse: wheel scrolls the highlight (click isn't reliably mappable across
- * terminals, so it's intentionally not wired). Resolves null when cancelled or stdin is not a TTY.
+ * Raw-TTY selector. Arrow keys (or j/k, scroll) move through the account rows; Enter or a number key
+ * (1-9) picks one to switch. Action hotkeys work anywhere: r rename · d doctor · q/Esc/Ctrl-C quit.
+ * Resolves to the chosen MenuChoice, a synthetic rename/doctor choice, or null (quit / not a TTY).
  */
 function interactiveSelect(title: string, choices: MenuChoice[]): Promise<MenuChoice | null> {
   const stdin = process.stdin;
   const stdout = process.stdout;
+  const colors = makeColors(stdout.isTTY === true && !process.env.NO_COLOR);
+  const rename: MenuChoice = { label: 'rename', action: { type: 'rename' } };
+  const doctor: MenuChoice = { label: 'doctor', action: { type: 'doctor' } };
+
   return new Promise((resolve) => {
     if (!stdin.isTTY) {
       resolve(null);
       return;
     }
-    let selected = Math.max(0, choices.findIndex((c) => c.label.startsWith(SYMBOLS.active)));
+    let selected = Math.max(0, choices.findIndex((c) => c.label.includes(SYMBOLS.active)));
 
-    stdout.write(`${title}\n`);
-    stdout.write('  ↑/↓ or scroll · Enter to select · 1-9 quick · q to cancel\n');
+    const header = `  ${colors.bold('claudep')} ${colors.dim(title.replace(/^claudep\s*/, ''))}`;
+    const footer = `  ${colors.cyan('r')} ${colors.dim('rename')}   ${colors.cyan('d')} ${colors.dim('doctor')}   ${colors.cyan('q')} ${colors.dim('quit')}`;
+    const hint = colors.dim('  ↑/↓ move · ↵ switch · 1-9 pick · q quit');
+    const chrome = 4; // header, divider, divider(after rows), footer+hint block lines rendered around list
+
+    stdout.write(`${header}\n${colors.dim(`  ${DIVIDER}`)}\n`);
+    if (!choices.length) stdout.write(colors.dim('  (no saved accounts yet)\n'));
 
     const render = (first: boolean) => {
-      if (!first) stdout.write(`\x1b[${choices.length}A`);
+      if (!first) stdout.write(`\x1b[${choices.length + chrome}A`);
       for (let i = 0; i < choices.length; i++) {
         const active = i === selected;
-        const line = active ? `\x1b[36m❯ ${choices[i]!.label}\x1b[0m` : `  ${choices[i]!.label}`;
+        const line = active ? `${colors.cyan('❯')} ${choices[i]!.label}` : `  ${choices[i]!.label}`;
         stdout.write(`\x1b[2K\r${line}\n`);
       }
+      stdout.write(`\x1b[2K\r${colors.dim(`  ${DIVIDER}`)}\n`);
+      stdout.write(`\x1b[2K\r${footer}\n`);
+      stdout.write(`\x1b[2K\r\n`);
+      stdout.write(`\x1b[2K\r${hint}\n`);
     };
     render(true);
 
@@ -153,6 +154,7 @@ function interactiveSelect(title: string, choices: MenuChoice[]): Promise<MenuCh
     stdout.write('\x1b[?1000h\x1b[?1006h'); // enable mouse reporting (X10 + SGR)
 
     const move = (delta: number) => {
+      if (!choices.length) return;
       selected = (selected + delta + choices.length) % choices.length;
       render(false);
     };
@@ -173,6 +175,8 @@ function interactiveSelect(title: string, choices: MenuChoice[]): Promise<MenuCh
       }
       if (data === '\x1b[A' || data === '\x1bOA' || data === 'k') return move(-1);
       if (data === '\x1b[B' || data === '\x1bOB' || data === 'j') return move(1);
+      if (data === 'r') return finish(rename);
+      if (data === 'd') return finish(doctor);
       if (data === '\r' || data === '\n') return finish(choices[selected] ?? null);
       if (data === '\x03' || data === 'q' || data === '\x1b') return finish(null);
       if (data.length === 1 && data >= '1' && data <= '9') {

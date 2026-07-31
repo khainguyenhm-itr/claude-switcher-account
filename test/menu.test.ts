@@ -57,17 +57,18 @@ function stubIO(overrides: Partial<MenuIO> & { picks?: (MenuChoice | null)[] } =
 const view = (name: string, active = false): AccountView => ({ name, email: name, savedAt: 'T', active });
 
 describe('buildMenuChoices', () => {
-  it('lists accounts (switch) plus rename/remove/doctor/quit', () => {
-    const choices = buildMenuChoices([view('a@x.com', true), view('b@x.com')]);
-    expect(choices[0]).toMatchObject({ action: { type: 'switch', name: 'a@x.com' } });
+  it('lists one numbered switch row per account, in email order', () => {
+    const choices = buildMenuChoices([view('b@x.com'), view('a@x.com', true)]);
     const types = choices.map((c) => c.action.type);
-    expect(types).toEqual(['switch', 'switch', 'rename', 'remove', 'doctor', 'quit']);
-    expect(choices[0]!.label).toContain('— active');
+    expect(types).toEqual(['switch', 'switch']);
+    expect(choices[0]).toMatchObject({ action: { type: 'switch', name: 'a@x.com' } }); // a sorts first
+    expect(choices[0]!.label).toContain('1');
+    expect(choices[0]!.label).toContain('active');
+    expect(choices[1]!.label).toContain('2');
   });
 
-  it('omits rename/remove when there are no accounts', () => {
-    const types = buildMenuChoices([]).map((c) => c.action.type);
-    expect(types).toEqual(['doctor', 'quit']);
+  it('returns no rows when there are no accounts', () => {
+    expect(buildMenuChoices([])).toEqual([]);
   });
 });
 
@@ -79,7 +80,7 @@ describe('dispatchMenu', () => {
     const io = stubIO();
     await dispatchMenu(mgr, { type: 'switch', name: 'b@x.com' }, io);
     expect(store.canonical).toBe('BLOB_B');
-    expect(io.lines.join('\n')).toContain('Switched to b@x.com');
+    expect(io.lines.join('\n')).toContain('Now using b@x.com');
   });
 
   it('doctor prints the doctor report', async () => {
@@ -96,15 +97,6 @@ describe('dispatchMenu', () => {
     const io = stubIO({ picks: [{ label: 'a@x.com', action: { type: 'switch', name: 'a@x.com' } }], ask: async () => 'work' });
     await dispatchMenu(mgr, { type: 'rename' }, io);
     expect(meta.read().accounts[0]!.name).toBe('work');
-  });
-
-  it('remove picks an account and deletes it after confirm', async () => {
-    const { store, meta, mgr } = setup();
-    await meta.update((d) => d.accounts.push({ name: 'a@x.com', email: 'a@x.com', fingerprint: 'f', savedAt: 'T' }));
-    store.saved['a@x.com'] = 'X';
-    const io = stubIO({ picks: [{ label: 'a@x.com', action: { type: 'switch', name: 'a@x.com' } }], confirm: async () => true });
-    await dispatchMenu(mgr, { type: 'remove' }, io);
-    expect(meta.read().accounts).toHaveLength(0);
   });
 
   it('quit does nothing', async () => {

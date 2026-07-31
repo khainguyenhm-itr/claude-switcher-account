@@ -2,6 +2,7 @@ import type { CredentialStore, AccountMeta, AccountView, OauthLabel, Config } fr
 import type { MetadataStore } from './metadataStore.js';
 import type { ProfileFile } from './profileFile.js';
 import { fingerprint } from './fingerprint.js';
+import { orderAccounts } from './order.js';
 
 export interface AccountManagerDeps {
   store: CredentialStore;
@@ -91,6 +92,13 @@ export class AccountManager {
       d.accounts = [...d.accounts.filter((a) => a.name !== nameToWrite), entry];
     });
     return toView(entry, true);
+  }
+
+  /** Map a 1-based index (as printed by `list`) to an account name, or null if out of range. */
+  async resolveByIndex(n: number): Promise<string | null> {
+    if (!Number.isInteger(n) || n < 1) return null;
+    const ordered = orderAccounts(await this.listAccounts());
+    return ordered[n - 1]?.name ?? null;
   }
 
   async switchTo(name: string): Promise<void> {
