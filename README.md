@@ -36,15 +36,24 @@ Verify with `claude-p doctor`. On macOS the first run may raise a Keychain
 ## Commands
 
 ```
+claude-p                      # interactive menu: pick an account to switch to, or an action
 claude-p list                 # (ls) list saved accounts, mark the active one
 claude-p current              # (status) show the active login
 claude-p switch <name>        # (use) make <name> the active login
 claude-p remove <name> [-y]   # (rm) forget a saved account; -y skips the confirm
 claude-p rename <old> <new>   # relabel a saved account
+claude-p version              # show the version and check npm for a newer one
 claude-p doctor               # diagnose credential path, config, and store
 ```
 
 Global flags: `--json` (on read commands), `--version`, `--help`.
+
+### Interactive menu
+
+Running `claude-p` with no arguments (in a terminal) opens a menu listing your
+saved accounts plus Rename / Remove / Doctor / Quit. Navigate with **↑/↓ or the
+mouse wheel**, press **Enter** to select (or a **number key** for a quick pick),
+and **q**/**Esc** to cancel. Selecting an account switches to it.
 
 ## How capture works
 

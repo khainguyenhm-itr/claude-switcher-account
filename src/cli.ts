@@ -4,12 +4,16 @@ import { AccountManager } from './accountManager.js';
 import { createManager } from './app.js';
 import { formatList, formatCurrent, SYMBOLS } from './format.js';
 import { runDoctor, buildDoctorDeps } from './doctor.js';
+import { VERSION, checkForUpdate, formatVersion, type UpdateInfo } from './version.js';
+import { runInteractiveMenu } from './menu.js';
 
 export interface CliDeps {
   manager?: AccountManager;
   now?: () => number;
   out?: (s: string) => void;
   confirm?: (question: string) => Promise<boolean>;
+  checkUpdate?: (current: string) => Promise<UpdateInfo | null>;
+  menu?: (manager: AccountManager, out: (s: string) => void) => Promise<void>;
 }
 
 async function defaultConfirm(question: string): Promise<boolean> {
@@ -25,8 +29,29 @@ export function buildProgram(deps: CliDeps = {}): Command {
   const confirm = deps.confirm ?? defaultConfirm;
   const manager = () => deps.manager ?? createManager();
 
+  const checkUpdate = deps.checkUpdate ?? ((current: string) => checkForUpdate(current));
+  const runMenu = deps.menu ?? runInteractiveMenu;
+
   const program = new Command();
-  program.name('claude-p').description('Switch between Claude Code logins').version('1.0.0').exitOverride();
+  program.name('claude-p').description('Switch between Claude Code logins').version(VERSION).exitOverride();
+
+  // No subcommand → interactive menu (pick an account to switch, or an action). Falls back to help
+  // when not attached to a terminal (e.g. piped), so scripts still get usage text.
+  program.action(async () => {
+    /* v8 ignore next 4 -- TTY guard: only reachable without an injected menu, needs a real terminal */
+    if (!deps.menu && (!process.stdin.isTTY || !process.stdout.isTTY)) {
+      out(program.helpInformation());
+      return;
+    }
+    await runMenu(manager(), out);
+  });
+
+  program
+    .command('version')
+    .description('Show the version and check npm for a newer one')
+    .action(async () => {
+      out(formatVersion(await checkUpdate(VERSION)));
+    });
 
   // Run reconcile before each command (best-effort — never blocks the command).
   async function reconcileFirst(mgr: AccountManager): Promise<void> {

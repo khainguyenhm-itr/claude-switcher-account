@@ -57,6 +57,7 @@ async function run(mgr: AccountManager, argv: string[], confirm = async () => tr
     now: () => Date.parse('2026-07-31T12:00:00Z'),
     out: (s) => lines.push(s),
     confirm,
+    checkUpdate: async () => null, // never hit the network in tests
   });
   await program.parseAsync(['node', 'claude-p', ...argv]);
   return lines.join('\n');
@@ -148,6 +149,28 @@ describe('cli commands', () => {
     const out = await run(mgr, ['remove', 'a@x.com'], async () => false);
     expect(out).toContain('Cancelled');
     expect(meta.read().accounts).toHaveLength(1);
+  });
+
+  it('version prints the version header', async () => {
+    const { mgr } = makeManager('', {});
+    const out = await run(mgr, ['version']);
+    expect(out).toContain('claude-p 1.1.0');
+  });
+
+  it('no subcommand runs the interactive menu', async () => {
+    const { mgr } = makeManager('', {});
+    const lines: string[] = [];
+    let menuRan = false;
+    const program = buildProgram({
+      manager: mgr,
+      out: (s) => lines.push(s),
+      checkUpdate: async () => null,
+      menu: async () => {
+        menuRan = true;
+      },
+    });
+    await program.parseAsync(['node', 'claude-p']);
+    expect(menuRan).toBe(true);
   });
 
   it('list --json prints machine-readable output', async () => {
