@@ -57,7 +57,7 @@ describe('runDoctor', () => {
     const home = mkdtempSync(join(tmpdir(), 'clp-dd-'));
     const d = buildDoctorDeps({ platform: 'linux', home, osUsername: 'k' });
     expect(d.platform).toBe('linux');
-    expect(d.config.logoutBehavior).toBe('delete-switch');
+    expect(d.config.logoutBehavior).toBe('keep');
     expect(typeof d.store.isAvailable).toBe('function');
   });
 });
