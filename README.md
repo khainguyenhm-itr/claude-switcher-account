@@ -12,11 +12,24 @@ canonical credential when you switch, so everything else in `~/.claude` stays sh
 
 ## Install
 
+Requires Node ≥ 18.
+
+From npm (once published):
+
 ```bash
 npm i -g claude-profiles
 ```
 
-Requires Node ≥ 18.
+From source or git (the `prepare` script builds automatically):
+
+```bash
+npm i -g git+<repo-url>
+# or, from a local clone:
+git clone <repo-url> claude-profiles && cd claude-profiles && npm i -g .
+```
+
+Verify with `claude-p doctor`. On macOS the first run may raise a Keychain
+"allow access" dialog — click Allow.
 
 ## Commands
 

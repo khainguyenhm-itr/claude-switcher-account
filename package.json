@@ -8,6 +8,8 @@
   "engines": { "node": ">=18" },
   "scripts": {
     "build": "tsup src/bin.ts --format esm --target node18 --clean",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
