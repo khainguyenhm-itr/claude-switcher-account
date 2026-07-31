@@ -88,7 +88,6 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "noUncheckedIndexedAccess": true,
     "declaration": false,
     "outDir": "dist"
   },
@@ -685,7 +684,7 @@ git commit -m "feat: credential store factory by platform"
 
 ```ts
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MetadataStore } from '../src/metadataStore.js';
@@ -724,7 +723,7 @@ describe('MetadataStore', () => {
     const s = newStore();
     const path = (s as unknown as { path: string }).path;
     // simulate corruption
-    require('node:fs').writeFileSync(path, '{ broken');
+    writeFileSync(path, '{ broken');
     expect(s.read()).toEqual({ accounts: [] });
   });
 });
