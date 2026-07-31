@@ -1,4 +1,4 @@
-# claude-profiles (`clp`) — Claude Account Manager CLI — Design
+# claude-profiles (`claude-p`) — Claude Account Manager CLI — Design
 
 Date: 2026-07-31
 Status: Approved (design)
@@ -130,8 +130,8 @@ The daemon watches `~/.claude.json`. On each change, `reconcileOnChange`:
 
 `reconcileOnChange` never throws — safe to call from a watcher.
 
-There is **no manual `save` command**. Custom names are set with `clp rename`.
-`clp daemon install` runs one reconcile immediately so the current login is
+There is **no manual `save` command**. Custom names are set with `claude-p rename`.
+`claude-p daemon install` runs one reconcile immediately so the current login is
 captured at setup time, closing the only gap where nothing was watching yet.
 
 ### Logout behavior (configurable)
@@ -156,17 +156,24 @@ a real data-loss risk; the toggle lets the user opt out without a code change.
 ## CLI commands
 
 ```
-clp list                 # (ls) list saved accounts, mark the active one
-clp current              # (status/whoami) show the active login
-clp switch <name>        # (use) make <name> the active login
-clp remove <name>        # (rm) forget a saved account
-clp rename <old> <new>   # relabel / rekey a saved account
-clp daemon run           # foreground reconcile loop (invoked by launchd/systemd/Task Scheduler)
-clp daemon start|stop|status
-clp daemon install|uninstall   # create/remove OS autostart, and run one reconcile on install
+claude-p list                 # (ls) list saved accounts, mark the active one
+claude-p current              # (status/whoami) show the active login
+claude-p switch <name>        # (use) make <name> the active login
+claude-p remove <name> [-y]   # (rm) forget a saved account; -y skips the confirm prompt
+claude-p rename <old> <new>   # relabel / rekey a saved account
+claude-p doctor               # diagnose OS credential path, config, store, and daemon
+claude-p daemon run           # foreground reconcile loop (invoked by launchd/systemd/Task Scheduler)
+claude-p daemon start|stop|status
+claude-p daemon install|uninstall   # create/remove OS autostart, and run one reconcile on install
 ```
 
-- Output is human-readable by default; `--json` on read commands for scripting.
+- Global flags: `--json` (read commands, machine-readable output), `--version`, `--help`.
+  Each command also has `claude-p <command> --help`.
+- `remove` asks for confirmation by default; `-y`/`--yes` skips it (for scripts).
+- `doctor` prints a per-section checklist (system, Claude login, claude-profiles
+  config/store/credentials, daemon) with ✓/✗/○ per check and a fix hint on each
+  failure; exits non-zero if any check fails. It is the first thing to run when the
+  per-OS credential location is wrong.
 - On an unsupported platform / missing backend, commands print a clear message and
   exit non-zero rather than crashing.
 
@@ -207,7 +214,7 @@ clp daemon install|uninstall   # create/remove OS autostart, and run one reconci
 
 ## Distribution
 
-- npm package `claude-profiles`, `bin: { clp: … }`. `npm i -g claude-profiles`.
+- npm package `claude-profiles`, `bin: { "claude-p": … }`. `npm i -g claude-profiles`.
 - Node ≥18. No native modules: macOS uses the `security` CLI, Linux/Windows use
   plain files — so no `keytar`/node-gyp build step.
 
