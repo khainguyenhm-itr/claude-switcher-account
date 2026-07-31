@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # postinstall self-skips on non-global installs, but be explicit in CI.
+      - run: npm ci
+        env:
+          CLAUDE_P_NO_DAEMON: '1'
+      - run: npm run typecheck
+      - run: npm test

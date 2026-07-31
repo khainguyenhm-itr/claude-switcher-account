@@ -105,6 +105,28 @@ Configured in `~/.claude-profiles/config.json`:
 On macOS the first read of Claude's Keychain item may raise an "allow access"
 dialog — click Allow. Run `claude-p doctor` if anything looks off.
 
+## Uninstalling
+
+Your saved accounts live in the Keychain (service `claude-profiles-accounts`) and
+`~/.claude-profiles/` — **outside** the npm package — so uninstalling the CLI does
+**not** delete them. Reinstalling picks them right back up.
+
+Remove cleanly (turn off the autostart watcher first, or it's left orphaned pointing
+at the deleted binary):
+
+```bash
+claude-p daemon uninstall
+npm rm -g claude-login-switcher
+```
+
+To also erase the saved accounts:
+
+```bash
+rm -rf ~/.claude-profiles
+# macOS also: delete each Keychain item
+security delete-generic-password -s claude-profiles-accounts -a "<account-name>"
+```
+
 ## Scope
 
 Switching changes the login for **all** Claude Code on the machine (the canonical

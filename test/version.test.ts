@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compareVersions, checkForUpdate, formatVersion } from '../src/version.js';
+import { compareVersions, checkForUpdate, formatVersion, VERSION } from '../src/version.js';
 
 function fetchReturning(body: unknown, ok = true): typeof fetch {
   return (async () => ({ ok, json: async () => body })) as unknown as typeof fetch;
@@ -39,7 +39,7 @@ describe('checkForUpdate', () => {
 
 describe('formatVersion', () => {
   it('shows the current version header', () => {
-    expect(formatVersion(null)).toContain('claude-p 1.3.0');
+    expect(formatVersion(null)).toContain(`claude-p ${VERSION}`);
   });
   it('suggests an update when newer is available', () => {
     expect(formatVersion({ current: '1.0.0', latest: '2.0.0', isNewer: true })).toContain('v2.0.0 available');

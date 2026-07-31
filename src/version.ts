@@ -1,5 +1,8 @@
-export const PKG_NAME = 'claude-login-switcher';
-export const VERSION = '1.3.0';
+import pkg from '../package.json';
+
+// Single source of truth: name/version come from package.json (inlined at build by tsup).
+export const PKG_NAME: string = pkg.name;
+export const VERSION: string = pkg.version;
 
 /** -1 if a < b, 0 if equal, 1 if a > b. Compares the first three numeric segments. */
 export function compareVersions(a: string, b: string): number {
