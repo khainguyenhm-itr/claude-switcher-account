@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runDoctor } from '../src/doctor.js';
+import { runDoctor, buildDoctorDeps } from '../src/doctor.js';
 import { MetadataStore } from '../src/metadataStore.js';
 import { ProfileFile } from '../src/profileFile.js';
 import type { CredentialStore } from '../src/types.js';
@@ -51,5 +51,13 @@ describe('runDoctor', () => {
     const { ok, report } = await runDoctor({ ...base, store: unavailable });
     expect(ok).toBe(false);
     expect(report).toContain('unavailable');
+  });
+
+  it('buildDoctorDeps assembles real dependencies for a given env', () => {
+    const home = mkdtempSync(join(tmpdir(), 'clp-dd-'));
+    const d = buildDoctorDeps({ platform: 'linux', home, osUsername: 'k' });
+    expect(d.platform).toBe('linux');
+    expect(d.config.logoutBehavior).toBe('delete-switch');
+    expect(typeof d.store.isAvailable).toBe('function');
   });
 });

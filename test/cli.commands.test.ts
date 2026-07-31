@@ -118,6 +118,38 @@ describe('cli commands', () => {
     expect(out).toContain('work');
   });
 
+  it('current shows the active login after reconcile', async () => {
+    const { mgr } = makeManager('BLOB', { oauthAccount: { emailAddress: 'a@x.com', organizationName: 'ITR' } });
+    const out = await run(mgr, ['current']);
+    expect(out).toContain('a@x.com');
+  });
+
+  it('switch reports an error for an unknown account', async () => {
+    const { mgr } = makeManager('', {});
+    const out = await run(mgr, ['switch', 'nope@x.com']);
+    expect(out).toMatch(/not found/i);
+  });
+
+  it('rename reports an error for a duplicate target', async () => {
+    const { store, meta, mgr } = makeManager('', {});
+    await meta.update((d) => {
+      d.accounts.push({ name: 'a@x.com', email: 'a@x.com', fingerprint: 'f', savedAt: 'T' });
+      d.accounts.push({ name: 'b@x.com', email: 'b@x.com', fingerprint: 'g', savedAt: 'T' });
+    });
+    store.saved['a@x.com'] = 'X';
+    const out = await run(mgr, ['rename', 'a@x.com', 'b@x.com']);
+    expect(out).toMatch(/already exists/i);
+  });
+
+  it('remove cancels when the user declines', async () => {
+    const { store, meta, mgr } = makeManager('', {});
+    await meta.update((d) => d.accounts.push({ name: 'a@x.com', email: 'a@x.com', fingerprint: 'f', savedAt: 'T' }));
+    store.saved['a@x.com'] = 'X';
+    const out = await run(mgr, ['remove', 'a@x.com'], async () => false);
+    expect(out).toContain('Cancelled');
+    expect(meta.read().accounts).toHaveLength(1);
+  });
+
   it('list --json prints machine-readable output', async () => {
     const { meta, mgr } = makeManager('', {});
     await meta.update((d) =>
