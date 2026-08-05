@@ -37,10 +37,10 @@
     "scripts/postinstall.mjs"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
-    "build": "tsup src/bin.ts --format esm --target node18 --clean",
+    "build": "tsup src/bin.ts --format esm --target node20 --clean",
     "prepare": "npm run build",
     "postinstall": "node scripts/postinstall.mjs",
     "prepublishOnly": "npm run typecheck && npm test",

@@ -20,7 +20,7 @@ in `~/.claude` stays shared.
 
 ## Install
 
-Requires Node ≥ 18.
+Requires Node ≥ 20.
 
 From npm:
 

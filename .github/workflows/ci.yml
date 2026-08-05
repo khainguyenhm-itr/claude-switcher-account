@@ -10,7 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [18, 20, 22]
+        # Node 18 is EOL (Apr 2025) and the test toolchain dropped it: vitest 4
+        # bundles rolldown, which requires ^20.19 || >=22.12.
+        node: [20, 22]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
