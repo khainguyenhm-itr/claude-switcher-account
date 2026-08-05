@@ -1,14 +1,22 @@
-# claude-profiles (`claudep`)
+# claude-switcher-account — switch between multiple Claude Code accounts (`claudep`)
 
-Switch between multiple Claude Code logins from the terminal. Save several
-logged-in accounts, pick one to use, and only re-login when a token actually
-breaks. macOS + Linux + Windows.
+Use several Claude Code accounts on one machine and switch between them in a
+single command. `claudep` saves each logged-in account, swaps the active one
+instantly, and only makes you log in again when a token actually breaks.
+macOS + Linux + Windows.
+
+```bash
+npm i -g claude-switcher-account
+claudep          # pick an account to switch to
+```
 
 ## Why
 
 Claude Code keeps a single active login per machine — logging into a second
-account overwrites the first. `claudep` snapshots each login and swaps only the
-canonical credential when you switch, so everything else in `~/.claude` stays shared.
+account overwrites the first, so juggling a personal account and a work account
+normally means re-authenticating every time you change. `claudep` snapshots each
+login and swaps only the canonical credential when you switch, so everything else
+in `~/.claude` stays shared.
 
 ## Install
 
@@ -17,21 +25,43 @@ Requires Node ≥ 18.
 From npm:
 
 ```bash
-npm i -g claude-login-switcher
+npm i -g claude-switcher-account
 ```
 
-(The npm package is `claude-login-switcher`; the command it installs is `claudep`.)
+(The npm package is `claude-switcher-account`; the command it installs is `claudep`.)
 
 From source or git (the `prepare` script builds automatically):
 
 ```bash
-npm i -g git+<repo-url>
+npm i -g git+https://github.com/khainguyenhm-itr/claude-switcher-account.git
 # or, from a local clone:
-git clone <repo-url> claude-profiles && cd claude-profiles && npm i -g .
+git clone https://github.com/khainguyenhm-itr/claude-switcher-account.git
+cd claude-switcher-account && npm i -g .
 ```
 
 Verify with `claudep doctor`. On macOS the first run may raise a Keychain
 "allow access" dialog — click Allow.
+
+### Migrating from `claude-login-switcher`
+
+The npm package was renamed; the command is still `claudep`. npm has no rename
+redirect, so `npm update -g claude-login-switcher` will never find the new
+releases — reinstall once, **removing the old package first** (both packages own
+the `claudep` bin, so installing before removing leaves you without the command):
+
+```bash
+npm rm -g claude-login-switcher
+npm i -g claude-switcher-account
+claudep list                     # your accounts are still there
+```
+
+Nothing of yours is lost: saved accounts, config, and credentials live in
+`~/.claude-profiles/` and the Keychain, outside the package, and `npm rm` has no
+uninstall hook that touches them. The autostart watcher keeps its OS identifiers,
+so the new install rewrites the same launchd/systemd/Task entry in place — no
+`claudep daemon uninstall` needed, and nothing left orphaned. Between the two
+commands the watcher points at a deleted binary and fails for a few seconds;
+the reinstall fixes it.
 
 ## Commands
 
@@ -75,7 +105,7 @@ captures every login/switch/logout the moment it happens — no `claudep` comman
 needed. It autostarts on login (launchd on macOS, systemd user service on Linux,
 a logon Task on Windows). Check with `claudep daemon status`; turn it off with
 `claudep daemon uninstall`, or skip it at install time with
-`CLAUDE_P_NO_DAEMON=1 npm i -g claude-login-switcher`.
+`CLAUDE_P_NO_DAEMON=1 npm i -g claude-switcher-account`.
 
 **Lazy (fallback).** With the daemon off, every `claudep` command runs a
 reconcile first: it reads your current login and, if new, snapshots it. So after
@@ -121,7 +151,7 @@ at the deleted binary):
 
 ```bash
 claudep daemon uninstall
-npm rm -g claude-login-switcher
+npm rm -g claude-switcher-account
 ```
 
 To also erase the saved accounts:

@@ -1,4 +1,4 @@
-# Release runbook — claude-login-switcher (`claudep`)
+# Release runbook — claude-switcher-account (`claudep`)
 
 Quy trình phát hành: **kiểm tra → chọn mức nâng version → nhập mã 2FA → publish npm →
 push GitHub**, với **npm và GitHub luôn cùng một số version**.
@@ -61,7 +61,7 @@ git push --follow-tags
 
 Xong: kiểm tra lại
 ```bash
-npm view claude-login-switcher version   # == version vừa release
+npm view claude-switcher-account version # == version vừa release
 git tag --list 'v*' | tail -1            # == vX.Y.Z
 ```
 
