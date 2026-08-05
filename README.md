@@ -57,11 +57,14 @@ claudep list                     # your accounts are still there
 
 Nothing of yours is lost: saved accounts, config, and credentials live in
 `~/.claude-profiles/` and the Keychain, outside the package, and `npm rm` has no
-uninstall hook that touches them. The autostart watcher keeps its OS identifiers,
-so the new install rewrites the same launchd/systemd/Task entry in place — no
-`claudep daemon uninstall` needed, and nothing left orphaned. Between the two
-commands the watcher points at a deleted binary and fails for a few seconds;
-the reinstall fixes it.
+uninstall hook that touches them.
+
+The autostart watcher is renamed too, so the install deregisters the old entry
+(`com.claude-login-switcher.daemon`, `claude-login-switcher.service`, or the
+`claude-login-switcher` logon Task) before registering the new one — you are never
+left with two watchers, and no `claudep daemon uninstall` is needed first. If you
+upgrade with `CLAUDE_P_NO_DAEMON=1` the old entry survives, since nothing ran to
+clear it; a later `claudep daemon install` or `claudep daemon uninstall` removes it.
 
 ## Commands
 

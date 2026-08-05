@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, existsSync } from 'node:fs';
+import { mkdtempSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   launchdPlist,
   systemdUnit,
@@ -11,8 +11,14 @@ import {
   autostartInstalled,
   plistPath,
   systemdPath,
+  legacyPlistPath,
+  legacySystemdPath,
   LABEL,
   WIN_TASK,
+  UNIT,
+  LEGACY_LABEL,
+  LEGACY_WIN_TASK,
+  LEGACY_UNIT,
   type Exec,
 } from '../src/autostart.js';
 
@@ -24,6 +30,12 @@ function recordingExec(): { exec: Exec; calls: string[][] } {
     calls.push([file, ...args]);
   };
   return { exec, calls };
+}
+
+/** Simulates a machine still carrying the pre-rename autostart entry. */
+function seedLegacy(path: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, 'legacy');
 }
 
 describe('content generators', () => {
@@ -47,6 +59,91 @@ describe('content generators', () => {
     expect(args).toContain('/SC');
     expect(args).toContain('ONLOGON');
     expect(args).toContain(WIN_TASK);
+  });
+});
+
+describe('identifiers', () => {
+  it('name the current package, not the pre-rename one', () => {
+    expect(LABEL).toBe('com.claude-switcher-account.daemon');
+    expect(WIN_TASK).toBe('claude-switcher-account');
+    expect(UNIT).toBe('claude-switcher-account.service');
+    expect(systemdPath('/home/u')).toBe('/home/u/.config/systemd/user/claude-switcher-account.service');
+  });
+
+  it('keep the pre-rename identifiers separately, for cleanup only', () => {
+    expect(LEGACY_LABEL).toBe('com.claude-login-switcher.daemon');
+    expect(LEGACY_WIN_TASK).toBe('claude-login-switcher');
+    expect(LEGACY_UNIT).toBe('claude-login-switcher.service');
+  });
+
+  it('never writes a legacy identifier into generated content', () => {
+    expect(launchdPlist(paths)).not.toContain('claude-login-switcher');
+    expect(systemdUnit(paths)).not.toContain('claude-login-switcher');
+    expect(windowsCreateArgs(paths).join(' ')).not.toContain('claude-login-switcher');
+  });
+});
+
+describe('legacy cleanup', () => {
+  it('darwin install unloads and deletes the pre-rename plist', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'clp-lg-mac-'));
+    seedLegacy(legacyPlistPath(home));
+    const { exec, calls } = recordingExec();
+
+    await installAutostart('darwin', paths, home, exec);
+
+    expect(existsSync(legacyPlistPath(home))).toBe(false);
+    expect(existsSync(plistPath(home))).toBe(true);
+    expect(calls.some((c) => c[0] === 'launchctl' && c.includes('unload') && c.includes(legacyPlistPath(home)))).toBe(true);
+  });
+
+  it('linux install disables and deletes the pre-rename unit', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'clp-lg-lin-'));
+    seedLegacy(legacySystemdPath(home));
+    const { exec, calls } = recordingExec();
+
+    await installAutostart('linux', paths, home, exec);
+
+    expect(existsSync(legacySystemdPath(home))).toBe(false);
+    expect(existsSync(systemdPath(home))).toBe(true);
+    expect(calls.some((c) => c[0] === 'systemctl' && c.includes('disable') && c.includes(LEGACY_UNIT))).toBe(true);
+  });
+
+  it('win32 install deletes the pre-rename scheduled task', async () => {
+    const { exec, calls } = recordingExec();
+
+    await installAutostart('win32', paths, '/tmp', exec);
+
+    expect(calls.some((c) => c[0] === 'schtasks' && c.includes('/Delete') && c.includes(LEGACY_WIN_TASK))).toBe(true);
+  });
+
+  it('uninstall also clears the pre-rename entry, for upgrades that skipped the daemon', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'clp-lg-un-'));
+    seedLegacy(legacyPlistPath(home));
+    const { exec } = recordingExec();
+
+    await uninstallAutostart('darwin', home, exec);
+
+    expect(existsSync(legacyPlistPath(home))).toBe(false);
+  });
+
+  it('install still succeeds when no legacy entry exists and its removal errors', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'clp-lg-clean-'));
+    const exec: Exec = async (_file, args) => {
+      // launchctl/systemctl/schtasks all fail on an entry that was never registered
+      if (args.some((a) => a.includes('claude-login-switcher'))) throw new Error('No such process');
+    };
+
+    const msg = await installAutostart('darwin', paths, home, exec);
+
+    expect(msg).toContain('launchd');
+    expect(existsSync(plistPath(home))).toBe(true);
+  });
+
+  it('reports autostart installed when only the pre-rename entry is present', () => {
+    const home = mkdtempSync(join(tmpdir(), 'clp-lg-det-'));
+    seedLegacy(legacyPlistPath(home));
+
+    expect(autostartInstalled('darwin', home)).toBe(true);
   });
 });
 
@@ -76,8 +173,7 @@ describe('installAutostart', () => {
   it('win32 creates a scheduled task', async () => {
     const { exec, calls } = recordingExec();
     const msg = await installAutostart('win32', paths, '/tmp', exec);
-    expect(calls[0]?.[0]).toBe('schtasks');
-    expect(calls[0]).toContain('/Create');
+    expect(calls.some((c) => c[0] === 'schtasks' && c.includes('/Create') && c.includes(WIN_TASK))).toBe(true);
     expect(msg).toContain(WIN_TASK);
   });
 });
