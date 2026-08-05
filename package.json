@@ -1,6 +1,6 @@
 {
   "name": "claude-switcher-account",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Switch between multiple Claude Code accounts from the terminal — save every login, swap in one command, no re-authenticating. macOS, Linux, Windows.",
   "keywords": [
     "claude",
