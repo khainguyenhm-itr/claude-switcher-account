@@ -30,13 +30,11 @@ npm i -g claude-switcher-account
 
 (The npm package is `claude-switcher-account`; the command it installs is `claudep`.)
 
-From source or git (the `prepare` script builds automatically):
+From source (the `prepare` script builds automatically):
 
 ```bash
-npm i -g git+https://github.com/khainguyenhm-itr/claude-switcher-account.git
-# or, from a local clone:
-git clone https://github.com/khainguyenhm-itr/claude-switcher-account.git
-cd claude-switcher-account && npm i -g .
+# from a local clone of the sources:
+npm i -g .
 ```
 
 Verify with `claudep doctor`. On macOS the first run may raise a Keychain

@@ -18,14 +18,6 @@
     "cli",
     "developer-tools"
   ],
-  "homepage": "https://github.com/khainguyenhm-itr/claude-switcher-account#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/khainguyenhm-itr/claude-switcher-account.git"
-  },
-  "bugs": {
-    "url": "https://github.com/khainguyenhm-itr/claude-switcher-account/issues"
-  },
   "license": "MIT",
   "author": "khainguyenhm-itr",
   "type": "module",
